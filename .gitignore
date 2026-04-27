@@ -1,0 +1,4 @@
+*.o
+active_reports-*
+*/
+city_manager
