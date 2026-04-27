@@ -10,12 +10,17 @@
 typedef struct {
     int    id;
     char   inspector[32];
+    int id;
+    char inspector[32];
     double latitude;
     double longitude;
     char   category[16];
     int    severity;
+    char category[32];
+    int severity;
     time_t timestamp;
     char   description[256];
+    char description[256];
 } Report;
 
 char role[32];
@@ -24,6 +29,8 @@ char command[32];
 char district[64];
 int  report_id = -1;
 int  threshold = -1;
+int report_id = -1;
+int threshold = -1;
 
 void mode_to_string(const mode_t mode, char out[10]) {
     out[0] = (mode & S_IRUSR) ? 'r' : '-';
@@ -69,10 +76,13 @@ void create_district() {
     char path[128];
     snprintf(path, sizeof(path), "%s/reports.dat",     district); create_file(path, 0664, NULL);
     snprintf(path, sizeof(path), "%s/district.cfg",    district); create_file(path, 0640, "severity_threshold=2\n");
+    snprintf(path, sizeof(path), "%s/reports.dat", district); create_file(path, 0664, NULL);
+    snprintf(path, sizeof(path), "%s/district.cfg", district); create_file(path, 0640, "severity_threshold=2\n");
     snprintf(path, sizeof(path), "%s/logged_district", district); create_file(path, 0644, NULL);
 
     char symlink_name[128];
     snprintf(path,         sizeof(path),        "%s/reports.dat",     district);
+    snprintf(path, sizeof(path), "%s/reports.dat", district);
     snprintf(symlink_name, sizeof(symlink_name), "active_reports-%s", district);
     unlink(symlink_name);
     symlink(path, symlink_name);
@@ -99,11 +109,18 @@ void add() {
     strncpy(r.inspector, user, sizeof(r.inspector) - 1);
 
     printf("Category (road/lighting/flooding): "); scanf("%15s",  r.category);
+    printf("Category (road/lighting/flooding): ");
+    fgets(r.category, sizeof(r.category), stdin);
+    r.category[strcspn(r.category, "\n")] = '\0';
+
     printf("Severity (1/2/3): "); scanf("%d", &r.severity);
     if (r.severity < 1 || r.severity > 3) { fprintf(stderr, "Invalid severity.\n"); return; }
     printf("X: ");  scanf("%lf", &r.latitude);
+    printf("X: "); scanf("%lf", &r.latitude);
     printf("Y: "); scanf("%lf", &r.longitude);
     printf("Description: ");   getchar();
+
+    printf("Description: "); getchar(); // consume newline from previous scanf
     fgets(r.description, sizeof(r.description), stdin);
     r.description[strcspn(r.description, "\n")] = '\0';
 
@@ -118,9 +135,66 @@ void add() {
     printf("Report #%d added.\n", r.id);
 }
 
+
+void list() {
+    char path[128];
+    snprintf(path, sizeof(path), "%s/reports.dat", district);
+
+    mode_t required;
+    if (strcmp(role, "manager") == 0) required = S_IRUSR;
+    else required = S_IRGRP;
+    if (!check_permission(path, required)) return;
+
+    struct stat st;
+    stat(path, &st);
+ 
+    char permissions[10];
+    mode_to_string(st.st_mode, permissions);
+    printf("File: %s | Permissions: %s | Size: %lld bytes | Modified: %s",
+        path, permissions, (long long)st.st_size, ctime(&st.st_mtime));
+ 
+    int fd = open(path, O_RDONLY);
+    if (fd < 0) { fprintf(stderr, "Error opening file: %s\n", strerror(errno)); return; }
+ 
+    Report r;
+    while (read(fd, &r, sizeof(Report)) == sizeof(Report))
+        printf("  [%d] %s | %s | severity %d | %s",
+            r.id, r.inspector, r.category, r.severity, ctime(&r.timestamp));
+ 
+    close(fd);
+}
+
+void view() {
+    char path[128];
+    snprintf(path, sizeof(path), "%s/reports.dat", district);
+ 
+    mode_t required;
+    if (strcmp(role, "manager") == 0) required = S_IRUSR;
+    else required = S_IRGRP;
+    if (!check_permission(path, required)) return;
+ 
+    int fd = open(path, O_RDONLY);
+    if (fd < 0) { fprintf(stderr, "Error opening file: %s\n", strerror(errno)); return; }
+ 
+    Report r;
+    while (read(fd, &r, sizeof(Report)) == sizeof(Report)) {
+        if (r.id == report_id) {
+            printf("ID: %d\nInspector: %s\nCategory: %s\nSeverity: %d\nLatitude: %lf\nLongitude: %lf\nTimestamp: %sDescription: %s\n",
+                   r.id, r.inspector, r.category, r.severity, r.latitude, r.longitude, ctime(&r.timestamp), r.description);
+            close(fd);
+            return;
+        }
+    }
+ 
+    fprintf(stderr, "Report #%d not found.\n", report_id);
+    close(fd);
+}
+
+
 int main(const int argc, char *argv[]) {
     if (argc < 2) {
         fprintf(stderr, "Use: %s --role <r> --user <u> --add/--list <district>\n", argv[0]);
+        fprintf(stderr, "Use: %s --role <r> --user <u> --add/--list/--view <district> (<report_id> for view)\n", argv[0]);
         return 1;
     }
 
@@ -131,10 +205,20 @@ int main(const int argc, char *argv[]) {
             strcpy(command, "add");
         }
 
+        else if (strcmp(argv[i], "--list") == 0 && i + 1 < argc) { strncpy(district, argv[++i], sizeof(district) - 1);
+            strcpy(command, "list");
+        }
+        else if (strcmp(argv[i], "--view") == 0 && i + 2 < argc) { strncpy(district, argv[++i], sizeof(district) - 1);
+            report_id = atoi(argv[++i]); 
+            strcpy(command, "view");
+        }
+    
     }
 
     if (role[0] == '\0' || user[0] == '\0' || command[0] == '\0') {
         fprintf(stderr, "Error: You must specify --role, --user and a command (add/list).\n");
+    if (role[0] == '\0' || user[0] == '\0' || command[0] == '\0' || district[0] == '\0' ) {
+        fprintf(stderr, "Error: You must specify --role, --user, --add/--list/--view, and a district (and report ID for view).\n");
         return 1;
     }
 
@@ -142,9 +226,13 @@ int main(const int argc, char *argv[]) {
         add();
     } else if (strcmp(command, "list") == 0) {
         // list();
+        list();
+    } else if (strcmp(command, "view") == 0) {
+        view();
     } else {
         fprintf(stderr, "Error: Invalid command.\n");
     }
+    } 
 
     return 0;
 }
