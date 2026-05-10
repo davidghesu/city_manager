@@ -7,6 +7,7 @@
 #include <sys/stat.h>
 #include <time.h>
 #include <errno.h>
+#include <sys/wait.h>
 
 
 typedef struct {
@@ -19,6 +20,7 @@ typedef struct {
     time_t timestamp;
     char description[256];
 } Report;
+
 
 char role[32];
 char user[64];
@@ -387,7 +389,40 @@ void filter(int argc, char *argv[]) {
     close(fd);
 }
 
+void remove_district() {
+    if (strcmp(role, "manager") != 0) { 
+        fprintf(stderr, "Error: manager only.\n"); 
+        return; 
+    }
 
+    struct stat st;
+    if (stat(district, &st) < 0) {
+        fprintf(stderr, "Error: district '%s' does not exist.\n", district);
+        return;
+    }
+
+    log_action(command); 
+
+    pid_t pid = fork();
+    if (pid == 0) {
+        execlp("rm", "rm", "-rf", district, NULL);
+        perror("execlp failed");
+        exit(1);
+    } else if (pid > 0) {
+        int status;
+        wait(&status);
+        if (WIFEXITED(status) && WEXITSTATUS(status) == 0) {
+            char symlink_name[128];
+            snprintf(symlink_name, sizeof(symlink_name), "active_reports-%s", district);
+            unlink(symlink_name);
+            printf("District %s removed.\n", district);
+        } else {
+            fprintf(stderr, "Error: rm -rf %s failed.\n", district);
+        }
+    } else {
+        perror("fork failed");
+    }
+}
 
 int main(const int argc, char *argv[]) {
     if (argc < 2) {
@@ -419,6 +454,10 @@ int main(const int argc, char *argv[]) {
         else if (strcmp(argv[i], "--filter") == 0 && i + 1 < argc) { strncpy(district, argv[++i], sizeof(district) - 1);
             strcpy(command, "filter");
         }
+        else if (strcmp(argv[i], "--remove_district") == 0 && i + 1 < argc) { strncpy(district, argv[++i], sizeof(district) - 1);
+            strcpy(command, "remove_district");
+        }
+        
 
 
 
@@ -441,6 +480,8 @@ int main(const int argc, char *argv[]) {
         update_threshold();
     } else if (strcmp(command, "filter") == 0) {
         filter(argc, argv);
+    } else if (strcmp(command, "remove_district") == 0) {
+        remove_district();
     } else {
         fprintf(stderr, "Error: Invalid command.\n");
     } 

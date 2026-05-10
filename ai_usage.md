@@ -7,13 +7,14 @@
 
 ##  Implementare `parse_condition()` și `match_condition()`
 
-### Promt
-Vreau sa analizezi si sa tii cont de acest pdf pe parcursul raspunsului tau. Trebuie sa ma ajuti cu cele 2 functii: match_condition() si parse_condition. Acum analizeza pdf ul si scrie-mi codul in C pentru cele 2 functii.
+### Promt 1
+Am o structura de raport în C care arată asa: ...
+Am nevoie de o functie care primeste un string de forma "field:operator:value" (ex "severity:>=:2" / "category:==:road") si il desparte in cele trei componente. Semnatura trebuie sa fie:
+int parse_condition(const char *input, char *field, char *op, char *value);
 
 ---
 
 ### Funcția `parse_condition`
-parse_condition sparge un string de forma field:operator:value în cele trei componente:
 
 ```c
 int parse_condition(const char *input, char *field, char *op, char *value) {
@@ -32,8 +33,9 @@ int parse_condition(const char *input, char *field, char *op, char *value) {
 ```
 
 ### Funcția `match_condition`
-match_condition verifică dacă un raport satisface condiția. Câmpurile numerice (severity, timestamp) se compară cu atol, cele string (category, inspector) cu strcmp:
-
+Folosind aceeasi structura Report de mai sus, am nevoie de o functie care verifica dacă un raport satisface o conditie deja parsata. Semnatura este:
+int match_condition(Report *r, const char *field, const char *op, const char *value)
+Functia returneaza 1 daca raportul satisface conditia si 0 altfel.
 ```c
 int match_condition(Report *r, const char *field, const char *op, const char *value) {
     if (strcmp(field, "severity") == 0 || strcmp(field, "timestamp") == 0) {
@@ -86,8 +88,5 @@ if (strcmp(field, "severity") == 0 || strcmp(field, "timestamp") == 0) {
     if (!strcmp(op, ">=")) return lhs >= rhs;
 }
 ```
-Alte două detalii importante:
-Numele variabilei tm: În unele compilatoare, tm este deja numele unei structuri sau al unei funcții. Este mai sigur să folosești ceva de genul tm_val sau tm_struct.
-
 #define _XOPEN_SOURCE: Funcția strptime nu face parte din standardul C de bază (este o extensie POSIX). Ca să nu primești erori la compilare, trebuie să pui #define _XOPEN_SOURCE chiar la începutul de tot al fișierului tău main.c, înainte de orice #include.
 
