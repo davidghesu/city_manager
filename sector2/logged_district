@@ -1,0 +1,4 @@
+[Mon May 11 12:29:39 2026] role=manager user=david action=add
+[Mon May 11 12:29:39 2026] notify_monitor: OK - monitor was informed
+[Mon May 11 12:29:52 2026] role=manager user=david action=add
+[Mon May 11 12:29:52 2026] notify_monitor: FAILED - monitor could not be informed

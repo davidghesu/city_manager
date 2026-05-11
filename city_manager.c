@@ -75,6 +75,36 @@ void log_action(const char *action) {
     close(fd);
 }
 
+void notify_monitor() {
+    int monitor_informed = 0;
+    
+    int fd = open(".monitor_pid", O_RDONLY);
+    if (fd >= 0) {
+        char pid_buf[10] = {0};
+        read(fd, pid_buf, sizeof(pid_buf) - 1);
+        close(fd);
+        int pid = atoi(pid_buf);
+        if (pid > 0 && kill(pid, SIGUSR1) == 0) {
+            monitor_informed = 1;
+        }
+    }
+
+    char path[128];
+    snprintf(path, sizeof(path), "%s/logged_district", district);
+    int fd_log = open(path, O_WRONLY | O_APPEND);
+    if (fd_log >= 0) {
+        time_t now = time(NULL);
+        char buf[256] = {0};
+        int len;
+        if (monitor_informed)
+            len = snprintf(buf, sizeof(buf), "[%s] notify_monitor: OK - monitor was informed\n", strtok(ctime(&now), "\n"));
+        else
+            len = snprintf(buf, sizeof(buf), "[%s] notify_monitor: FAILED - monitor could not be informed\n", strtok(ctime(&now), "\n"));
+        write(fd_log, buf, len);
+        close(fd_log);
+    }
+}
+
 void create_file(const char *path, const mode_t perm, const char *content) {
     int fd = open(path, O_WRONLY | O_CREAT | O_EXCL, perm);
     if (fd >= 0) {
@@ -141,10 +171,14 @@ void add() {
     fgets(r.category, sizeof(r.category), stdin);
     r.category[strcspn(r.category, "\n")] = '\0';
 
-    printf("Severity (1/2/3): "); scanf("%d", &r.severity);
-    if (r.severity < 1 || r.severity > 3) { fprintf(stderr, "Invalid severity.\n"); return; }
-    printf("X: "); scanf("%lf", &r.latitude);
-    printf("Y: "); scanf("%lf", &r.longitude);
+    printf("Severity (1/2/3): "); 
+    if (scanf("%d", &r.severity) != 1) { fprintf(stderr, "Invalid severity.\n"); close(fd); return; }
+    if (r.severity < 1 || r.severity > 3) { fprintf(stderr, "Invalid severity.\n"); close(fd); return; }
+    
+    printf("X: ");
+    if (scanf("%lf", &r.latitude) != 1) { fprintf(stderr, "Invalid coordinate.\n"); close(fd); return; }
+    printf("Y: ");
+    if (scanf("%lf", &r.longitude) != 1) { fprintf(stderr, "Invalid coordinate.\n"); close(fd); return; }
 
     printf("Description: "); getchar(); // consume newline from previous scanf
     fgets(r.description, sizeof(r.description), stdin);
@@ -156,6 +190,7 @@ void add() {
     close(fd);
 
     log_action(command);
+    notify_monitor();
     printf("Report #%d added.\n", r.id);
 }
 

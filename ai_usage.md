@@ -8,9 +8,9 @@
 ##  Implementare `parse_condition()` și `match_condition()`
 
 ### Promt 1
-Am o structura de raport în C care arată asa: ...
-Am nevoie de o functie care primeste un string de forma "field:operator:value" (ex "severity:>=:2" / "category:==:road") si il desparte in cele trei componente. Semnatura trebuie sa fie:
-int parse_condition(const char *input, char *field, char *op, char *value);
+#### Am o structura de raport în C care arată asa: ...
+#### Am nevoie de o functie care primeste un string de forma "field:operator:value" (ex "severity:>=:2" / "category:==:road") si il desparte in cele trei componente. Semnatura trebuie sa fie:
+#### int parse_condition(const char *input, char *field, char *op, char *value);
 
 ---
 
@@ -32,10 +32,15 @@ int parse_condition(const char *input, char *field, char *op, char *value) {
 }
 ```
 
+### Promt 2
+#### Folosind aceeasi structura Report de mai sus, am nevoie de o functie care verifica dacă un raport satisface o conditie deja parsata. Semnatura este:
+#### int match_condition(Report *r, const char *field, const char *op, const char *value)
+#### Functia returneaza 1 daca raportul satisface conditia si 0 altfel.
+
+--- 
+
 ### Funcția `match_condition`
-Folosind aceeasi structura Report de mai sus, am nevoie de o functie care verifica dacă un raport satisface o conditie deja parsata. Semnatura este:
-int match_condition(Report *r, const char *field, const char *op, const char *value)
-Functia returneaza 1 daca raportul satisface conditia si 0 altfel.
+
 ```c
 int match_condition(Report *r, const char *field, const char *op, const char *value) {
     if (strcmp(field, "severity") == 0 || strcmp(field, "timestamp") == 0) {
@@ -90,3 +95,13 @@ if (strcmp(field, "severity") == 0 || strcmp(field, "timestamp") == 0) {
 ```
 #define _XOPEN_SOURCE: Funcția strptime nu face parte din standardul C de bază (este o extensie POSIX). Ca să nu primești erori la compilare, trebuie să pui #define _XOPEN_SOURCE chiar la începutul de tot al fișierului tău main.c, înainte de orice #include.
 
+---
+
+# AI Usage Documentation - Phase 2
+
+### Promt
+#### Am acest cod pentru monitor_reports.c, verifica-l și spune-mi ce buguri am sau ce imbunatatiri pot sa fac.
+
+---
+
+The AI showed me some bugs and recommended using volatile sig_atomic_t instead of int for the end_process variable. The reason is that without volatile, the compiler can assume the variable never changes inside the while (!end_process) loop and skip re-reading it from memory, turning it into an infinite loop. sig_atomic_t is a special type made for variables that are modified inside signal handlers, making sure the read and write happen in one step.
